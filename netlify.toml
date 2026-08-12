@@ -1,0 +1,47 @@
+# Netlify configuration.
+#
+# There is no build step: the site is plain files in public/ plus the functions
+# in netlify/functions/. Nothing to install, nothing to bundle. That keeps the
+# payload small for people on slow mainland-China connections and removes a
+# whole class of deployment failure.
+#
+# Three environment variables must be set in the Netlify UI
+# (Site configuration → Environment variables) — never in this file:
+#   GAS_URL         the Apps Script web app /exec URL
+#   GAS_SECRET      the shared secret, matching the Apps Script property
+#   SESSION_SECRET  a long random string used to sign session cookies
+# See DEPLOY.md.
+
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  node_bundler = "esbuild"
+
+# The questionnaire is invite-only and must never be indexed.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), camera=(), microphone=(), interest-cohort=()"
+    # Everything is same-origin and self-hosted. No CDN, and in particular no
+    # Google Fonts — blocked in mainland China, where most respondents are.
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'"
+
+# Answers must never be served from a cache.
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "no-store"
+
+[[headers]]
+  for = "/assets/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

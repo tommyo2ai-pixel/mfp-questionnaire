@@ -1,0 +1,10 @@
+# Local mock backend — draft answers and generated submissions
+.local-store/
+
+# Secrets never belong in the repo; set them in the Netlify UI
+.env
+.env.*
+
+node_modules/
+.netlify/
+.DS_Store
