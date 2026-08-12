@@ -29,9 +29,17 @@ var PROP_SECRET = 'SHARED_SECRET';
 var PROP_ROOT_FOLDER = 'ROOT_FOLDER_ID';
 var PROP_NOTIFY = 'NOTIFY_EMAIL';
 var PROP_FAILURES = 'RECENT_FAILURES';
+var PROP_SITE_URL = 'SITE_URL';
 
 var ROOT_FOLDER_NAME = 'Ming Fong — Questionnaires';
 var DEFAULT_NOTIFY = 'tommy.chan@mingfongpaper.com';
+
+/* Where the questionnaire is served. This is only used to build the invite link
+   that gets sent to a client, so it can change at any time without affecting
+   codes already issued — the same code works on either address.
+   Change it with Ming Fong ▸ Set questionnaire address when the custom domain
+   is live. */
+var DEFAULT_SITE_URL = 'https://mfp-questionnaire.netlify.app';
 
 /* Unambiguous alphabet: no I, O, 0 or 1, because these codes get read aloud on
    the phone and retyped from WeChat messages. 8 characters ≈ 40 bits. */
@@ -398,6 +406,11 @@ function notifyAddress() {
 	return PropertiesService.getScriptProperties().getProperty(PROP_NOTIFY) || DEFAULT_NOTIFY;
 }
 
+function siteUrl() {
+	var value = PropertiesService.getScriptProperties().getProperty(PROP_SITE_URL) || DEFAULT_SITE_URL;
+	return value.replace(/\/+$/, '');
+}
+
 function sendNotification(summary, signals, flat, code, folder, pdf, submittedAt) {
 	var answered = flat.filter(function (item) {
 		return item.answer;
@@ -537,6 +550,7 @@ function onOpen() {
 		.addItem('Create invite…', 'createInvitePrompt')
 		.addSeparator()
 		.addItem('Set up sheets', 'setupSheet')
+		.addItem('Set questionnaire address…', 'setSiteUrlPrompt')
 		.addItem('Show settings', 'showSettings')
 		.addItem('Run self-test', 'selfTest')
 		.addToUi();
@@ -569,6 +583,9 @@ function setupSheet() {
 	if (!properties.getProperty(PROP_NOTIFY)) {
 		properties.setProperty(PROP_NOTIFY, DEFAULT_NOTIFY);
 	}
+	if (!properties.getProperty(PROP_SITE_URL)) {
+		properties.setProperty(PROP_SITE_URL, DEFAULT_SITE_URL);
+	}
 	rootFolder();
 
 	showSettings();
@@ -592,12 +609,37 @@ function showSettings() {
 			'\n\n' +
 			'GAS_URL\n' +
 			'The /exec URL from Deploy ▸ Manage deployments.\n\n' +
-			'Notifications go to: ' +
+			'Invite links point at: ' +
+			siteUrl() +
+			'\nNotifications go to: ' +
 			notifyAddress() +
 			'\nDrive folder: ' +
 			ROOT_FOLDER_NAME,
 		SpreadsheetApp.getUi().ButtonSet.OK,
 	);
+}
+
+/*
+ * Sheet menu ▸ Set questionnaire address. Use this when the custom domain goes
+ * live. Codes already issued keep working — only newly generated links change.
+ */
+function setSiteUrlPrompt() {
+	var ui = SpreadsheetApp.getUi();
+	var response = ui.prompt(
+		'Questionnaire address',
+		'Where the questionnaire is served, with no trailing slash.\n\nCurrently: ' + siteUrl(),
+		ui.ButtonSet.OK_CANCEL,
+	);
+	if (response.getSelectedButton() !== ui.Button.OK) return;
+
+	var value = response.getResponseText().trim().replace(/\/+$/, '');
+	if (!/^https:\/\/[^\s\/]+$/.test(value)) {
+		ui.alert('That does not look right', 'Enter the address on its own, for example:\n\nhttps://mfp-questionnaire.netlify.app', ui.ButtonSet.OK);
+		return;
+	}
+
+	PropertiesService.getScriptProperties().setProperty(PROP_SITE_URL, value);
+	ui.alert('Saved', 'New invite links will use:\n\n' + value + '\n\nCodes already sent still work on either address.', ui.ButtonSet.OK);
 }
 
 /** Sheet menu ▸ Create invite. Produces the code and the link to send. */
@@ -618,7 +660,8 @@ function createInvitePrompt() {
 	ui.alert(
 		'Invite created',
 		'Send this to the client:\n\n' +
-			'https://questionnaire.mingfongpaper.com/?c=' +
+			siteUrl() +
+			'/?c=' +
 			invite.code +
 			'\n\nOr have them enter the code manually:\n\n' +
 			invite.code +

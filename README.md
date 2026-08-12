@@ -18,8 +18,10 @@ node scripts/dev.mjs        # http://localhost:4330, no Google account needed
 
 **1. The client's browser never contacts Google.** `script.google.com` is
 blocked in mainland China, which is where most respondents are. The browser
-talks only to `questionnaire.mingfongpaper.com`; a Netlify function talks to
-Apps Script server-side, where the block does not apply.
+talks only to the questionnaire's own origin — `mfp-questionnaire.netlify.app`
+today, `questionnaire.mingfongpaper.com` once the domain is attached — and a
+Netlify function talks to Apps Script server-side, where the block does not
+apply.
 
 **2. The questionnaire is data, not markup.** `public/js/schema.partA.js`
 describes every question. One renderer builds the form from it, and the same

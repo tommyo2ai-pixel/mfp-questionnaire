@@ -4,8 +4,8 @@
  * This call happens server-side, from Netlify's edge. That is the whole point:
  * script.google.com is blocked in mainland China, where most of the people
  * filling in this questionnaire are sitting, so the browser must never contact
- * Google directly. Their browser talks to questionnaire.mingfongpaper.com and
- * nothing else.
+ * Google directly. Their browser talks to whichever address the questionnaire
+ * is served from and nothing else.
  *
  * Every request carries a shared secret. The Apps Script web app has to be
  * deployed as "anyone can access" for this to work at all — otherwise it would

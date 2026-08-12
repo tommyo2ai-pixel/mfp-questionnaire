@@ -1,9 +1,19 @@
 # Setting it up
 
-One-time setup, about 40 minutes. You need a Google account and a Netlify
+One-time setup, about 30 minutes. You need a Google account and a Netlify
 account. Both are free, and you already have Netlify from the website.
 
-Day-to-day use — sending a questionnaire to a client — is at the bottom, under
+The questionnaire runs on its own — nothing here touches
+`mingfongpaper.com` or the website's Netlify site. For the trial it lives at:
+
+```
+https://mfp-questionnaire.netlify.app
+```
+
+The custom domain is **Part 4**, and it is optional. Do it whenever you like;
+codes issued before the move keep working afterwards.
+
+Day-to-day use — sending a questionnaire to a client — is under
 **Sending a questionnaire**. That part takes about ten seconds.
 
 ---
@@ -14,14 +24,14 @@ Three pieces, each doing one job.
 
 | | Job |
 | --- | --- |
-| **Netlify** | Serves the questionnaire at questionnaire.mingfongpaper.com |
+| **Netlify** | Serves the questionnaire at mfp-questionnaire.netlify.app |
 | **Google Sheet + Apps Script** | Stores the invites, the drafts and the submissions; sends you the email |
 | **Google Drive** | Holds one folder per client, with their answers as JSON, Markdown and PDF |
 
-The client's browser only ever talks to **questionnaire.mingfongpaper.com**. It
-never contacts Google. That is deliberate and it matters: Google is blocked in
-mainland China, where most of your clients are. Netlify talks to Google on the
-server side, where the block does not apply.
+The client's browser only ever talks to the Netlify address. It never contacts
+Google. That is deliberate and it matters: Google is blocked in mainland China,
+where most of your clients are. Netlify talks to Google on the server side,
+where the block does not apply.
 
 ---
 
@@ -84,30 +94,26 @@ Step 6. You can see it again any time with **Ming Fong ▸ Show settings**.
 
 # Part 2 — The Netlify side
 
-## Step 5: Put the code on GitHub
+Your repository and site already exist:
 
-From this project folder on your Mac:
+- <https://github.com/tommyo2ai-pixel/mfp-questionnaire>
+- <https://app.netlify.com/projects/mfp-questionnaire>
 
-```bash
-git init && git add -A && git commit -m "Ming Fong questionnaire"
-```
+## Step 5: Push the code
 
-Then create a **private** repository at <https://github.com/new> named
-`mfp-questionnaire`, and push — replacing `YOUR-USERNAME`:
+From this project folder on your Mac, first time only:
 
 ```bash
-git remote add origin https://github.com/YOUR-USERNAME/mfp-questionnaire.git && git branch -M main && git push -u origin main
+git init && git add -A && git commit -m "Ming Fong questionnaire" && git branch -M main && git remote add origin https://github.com/tommyo2ai-pixel/mfp-questionnaire.git && git push -u origin main
 ```
 
-## Step 6: Create the Netlify site
+Netlify picks the push up and deploys within a minute or so. From then on, any
+later change is just `git add -A && git commit -m "…" && git push`.
 
-1. Go to <https://app.netlify.com> → **Add new site ▸ Import an existing
-   project** → **GitHub** → pick `mfp-questionnaire`.
-2. Leave the build settings alone. `netlify.toml` already sets them, and there
-   is no build step.
-3. Click **Deploy**.
-4. When it finishes, go to **Site configuration ▸ Environment variables** and
-   add three, using **Add a variable ▸ Add a single variable** for each:
+## Step 6: Set the three environment variables
+
+In Netlify: **Site configuration ▸ Environment variables**, then
+**Add a variable ▸ Add a single variable** for each:
 
 | Key | Value |
 | --- | --- |
@@ -119,17 +125,11 @@ git remote add origin https://github.com/YOUR-USERNAME/mfp-questionnaire.git && 
 node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 ```
 
-5. Go to **Deploys** and click **Trigger deploy ▸ Deploy site**. Environment
-   variables are only picked up by a new deploy, so this step is not optional.
+Then go to **Deploys** and click **Trigger deploy ▸ Deploy site**. Environment
+variables are only picked up by a new deploy, so this step is not optional.
 
-## Step 7: Point the subdomain at it
-
-1. In Netlify: **Domain management ▸ Add a domain** →
-   `questionnaire.mingfongpaper.com`.
-2. Netlify tells you which DNS record to create. Add it wherever
-   `mingfongpaper.com` is managed. If your DNS is already at Netlify, it offers
-   to do this for you — accept.
-3. Wait for the certificate. Usually a few minutes, occasionally an hour.
+The site is now live at **<https://mfp-questionnaire.netlify.app>**. That is a
+real HTTPS address you can send to a client today.
 
 ---
 
@@ -157,6 +157,36 @@ Create a real invite (below), open the link on your phone, answer a few
 questions, close the browser, reopen the link, and check your answers are still
 there. Then submit.
 
+That is the whole trial. You can start sending it to clients from here.
+
+---
+
+# Part 4 — The custom domain (optional, later)
+
+Everything works on `mfp-questionnaire.netlify.app`. Moving to
+`questionnaire.mingfongpaper.com` only changes the address; it changes nothing
+about how the questionnaire behaves, and **codes already issued keep working on
+both addresses**. So there is no rush and no risk in leaving it.
+
+When you want it:
+
+1. In Netlify: **Domain management ▸ Add a domain** →
+   `questionnaire.mingfongpaper.com`.
+2. Netlify tells you which DNS record to create. Add it wherever
+   `mingfongpaper.com` is managed. If your DNS is already at Netlify, it offers
+   to do this for you — accept.
+3. Wait for the certificate. Usually a few minutes, occasionally an hour.
+4. Open the address to confirm it loads.
+5. In the spreadsheet: **Ming Fong ▸ Set questionnaire address…** and enter
+   `https://questionnaire.mingfongpaper.com`.
+
+Step 5 is the one that is easy to forget. Without it, new invite links still
+point at the Netlify address — which still works, so nothing breaks; it just
+looks less like you.
+
+This is a subdomain. It does not touch `mingfongpaper.com` itself, and the
+website's own Netlify site is not involved at any point.
+
 ---
 
 # Sending a questionnaire
@@ -169,7 +199,7 @@ there. Then submit.
 The link looks like:
 
 ```
-https://questionnaire.mingfongpaper.com/?c=MFP-7K4M-2QX9
+https://mfp-questionnaire.netlify.app/?c=MFP-7K4M-2QX9
 ```
 
 The code works from any device, so a client can start on a computer and finish
@@ -219,7 +249,7 @@ The web app was deployed with the wrong access setting. Redo Step 4 and make
 sure **Who has access** is **Anyone**.
 
 **Nothing happens when a client opens the link.**
-Ask whether they can open <https://questionnaire.mingfongpaper.com> at all.
+Ask whether they can open <https://mfp-questionnaire.netlify.app> at all.
 Netlify is normally reachable from mainland China but is not guaranteed. If they
 cannot reach it, email them the questionnaire as a document instead — it is the
 same questions in the same order.

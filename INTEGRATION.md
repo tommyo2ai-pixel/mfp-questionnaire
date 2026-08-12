@@ -1,9 +1,9 @@
 # Folding this into mingfongpaper.com
 
-The questionnaire ships as its own Netlify site at
-`questionnaire.mingfongpaper.com`. It does not have to stay that way. Both sites
-run on Netlify, so moving it into the main website is mostly a file copy —
-the functions run unchanged.
+The questionnaire ships as its own Netlify site — `mfp-questionnaire.netlify.app`
+at first, `questionnaire.mingfongpaper.com` once the domain is attached. It does
+not have to stay that way. Both sites run on Netlify, so moving it into the main
+website is mostly a file copy — the functions run unchanged.
 
 Nothing here is required. A separate site is a perfectly good end state, and it
 has one real advantage: a bug in the questionnaire cannot take down the
