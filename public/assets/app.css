@@ -559,6 +559,57 @@ a {
 	line-height: 1.6;
 }
 
+/* A select has to opt out of the platform look to match the text inputs, and
+   then draw its own chevron. The arrow is an inline SVG data URI rather than a
+   file so it costs no extra request, and it sits in img-src 'self' data:. */
+.select {
+	appearance: none;
+	-webkit-appearance: none;
+	padding-right: 2.4rem;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%2364748b' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round' d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 0.85rem center;
+	cursor: pointer;
+}
+
+.select:disabled {
+	cursor: not-allowed;
+}
+
+/* Country code and number. The code box is fixed so the number field does not
+   jump about as countries with longer names are chosen. */
+.phone-row {
+	display: flex;
+	gap: 0.6rem;
+	align-items: center;
+	max-width: 30rem;
+}
+
+.phone-dial {
+	flex: 0 0 12.5rem;
+	width: 12.5rem;
+}
+
+.phone-number {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+@media (max-width: 560px) {
+	.phone-row {
+		flex-wrap: wrap;
+	}
+
+	.phone-dial {
+		flex: 1 1 100%;
+		width: 100%;
+	}
+
+	.phone-number {
+		flex: 1 1 100%;
+	}
+}
+
 .input-with-unit {
 	display: flex;
 	align-items: center;

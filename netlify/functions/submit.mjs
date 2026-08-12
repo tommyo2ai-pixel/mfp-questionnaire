@@ -62,8 +62,8 @@ export default async (request) => {
 			answers,
 			flat,
 			markdown: markdownFromFlat(flat, { ...meta, answers }),
-			signals: deriveSignals(answers),
-			summary: buildSummary(answers, meta),
+			signals: deriveSignals(answers, flat),
+			summary: buildSummary(answers, meta, flat),
 		});
 		return json({ ok: true, submittedAt: result.submittedAt || submittedAt });
 	} catch (error) {

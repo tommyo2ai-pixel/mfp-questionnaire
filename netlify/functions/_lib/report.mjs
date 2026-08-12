@@ -37,11 +37,13 @@ export function markdownFromFlat(flat, meta = {}) {
 	lines.push('');
 	lines.push('Flexographic Printing Standardization Program');
 	lines.push('');
+	const summary = buildSummary(answers, meta, flat);
+
 	lines.push(`**Company:** ${answers.a_company_name || meta.company || 'Unknown company'}`);
-	if (answers.a_site_address) lines.push(`**Site:** ${answers.a_site_address}`);
+	if (summary.site) lines.push(`**Site:** ${summary.site}`);
 	if (answers.a_contact_name) lines.push(`**Contact:** ${answers.a_contact_name}`);
 	if (answers.a_contact_email) lines.push(`**Email:** ${answers.a_contact_email}`);
-	if (answers.a_contact_phone) lines.push(`**Phone / WeChat:** ${answers.a_contact_phone}`);
+	if (summary.phone) lines.push(`**Phone / WeChat:** ${summary.phone}`);
 	lines.push(`**Submitted:** ${meta.submittedAt || ''}`);
 	lines.push(`**Reference:** ${meta.code || ''}`);
 	lines.push(`**Schema version:** ${meta.schemaVersion || ''}`);
@@ -84,7 +86,7 @@ const isBlank = (value) => {
 	return false;
 };
 
-export function deriveSignals(answers = {}) {
+export function deriveSignals(answers = {}, flat = []) {
 	const signals = [];
 	const has = (id, ...values) => values.includes(answers[id]);
 	const list = (id) => [].concat(answers[id] ?? []);
@@ -138,23 +140,49 @@ export function deriveSignals(answers = {}) {
 	}
 	// Travel is the first thing that moves the price. Guangdong is same-day by
 	// rail from Hong Kong; anywhere else usually means flights and a travel day.
-	if (answers.a_site_address && !/guangdong|guangzhou|shenzhen|dongguan|foshan|zhongshan|zhuhai|huizhou|jiangmen|广东|广州|深圳|东莞|佛山|中山|珠海|惠州|江门/i.test(answers.a_site_address)) {
+	// Country is checked first: a site outside Greater China is a different
+	// conversation entirely, and saying "outside Guangdong" about Vietnam would
+	// badly understate it.
+	const country = answers.a_site_country || '';
+	if (country && !['CN', 'HK', 'MO', 'TW'].includes(country)) {
 		signals.push(
-			`Site is "${answers.a_site_address}" — check travel. Outside Guangdong usually means flights and an extra travel day, so the proposal needs repricing.`,
+			`Site is in ${shown(flat, 'a_site_country') || country}, outside Greater China — flights, visa and days on site are all outside the standard proposal. Reprice before quoting.`,
+		);
+	} else if (
+		answers.a_site_address &&
+		!/guangdong|guangzhou|shenzhen|dongguan|foshan|zhongshan|zhuhai|huizhou|jiangmen|广东|广州|深圳|东莞|佛山|中山|珠海|惠州|江门/i.test(answers.a_site_address)
+	) {
+		signals.push(
+			`Site is "${answers.a_site_address.replace(/\s+/g, ' ').trim()}" — check travel. Outside Guangdong usually means flights and an extra travel day, so the proposal needs repricing.`,
 		);
 	}
 
 	return signals;
 }
 
+/*
+ * Some answers are stored as structures rather than text — a phone is
+ * { country, dial, number }, a country is an ISO code — and only the client
+ * holds the labels needed to render them. The flattened list already carries
+ * the exact text the customer saw, so read it from there instead of duplicating
+ * the country table on the server, where it could drift out of step.
+ */
+function shown(flat, id) {
+	const row = (flat || []).find((entry) => entry.id === id);
+	return (row && row.answer) || '';
+}
+
 /** Short header used in both the email and the spreadsheet summary row. */
-export function buildSummary(answers = {}, { code, company, submittedAt } = {}) {
+export function buildSummary(answers = {}, { code, company, submittedAt } = {}, flat = []) {
+	const address = String(answers.a_site_address || '').replace(/\s+/g, ' ').trim();
+	const country = shown(flat, 'a_site_country');
+
 	return {
 		company: answers.a_company_name || company || '',
-		site: answers.a_site_address || '',
+		site: [address, country].filter(Boolean).join(', '),
 		contact: answers.a_contact_name || '',
 		email: answers.a_contact_email || '',
-		phone: answers.a_contact_phone || '',
+		phone: shown(flat, 'a_contact_phone'),
 		employees: answers.a_employees || '',
 		code: code || '',
 		submittedAt: submittedAt || '',

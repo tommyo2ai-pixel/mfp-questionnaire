@@ -134,6 +134,10 @@ export function isEmpty(value) {
 	}
 	if (typeof value === 'object') {
 		if (value.notTracked === true) return false;
+		// A phone answer is the number. Picking a country code and typing nothing
+		// is not an answer, and must not count towards the progress figure or
+		// appear in the export as a bare "+86".
+		if ('number' in value && 'dial' in value) return isEmpty(value.number);
 		return Object.values(value).every(isEmpty);
 	}
 	return false;

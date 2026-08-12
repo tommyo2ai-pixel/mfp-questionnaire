@@ -1,9 +1,10 @@
 # Ming Fong Paper — Pre-Proposal Questionnaire
 
 Digital version of the Part A pre-proposal questionnaire for the Flexographic
-Printing Standardization Program. Clients log in with a code, answer over as
-many sittings as they need, and submit once. Answers land in Google Drive as
-JSON, Markdown and PDF, and Tommy gets an email.
+Printing Standardization Program. Creating an invite emails the client their own
+access code; they log in with it, answer over as many sittings as they need, and
+submit once. Answers land in Google Drive as JSON, Markdown and PDF, and Tommy
+gets an email.
 
 - **DEPLOY.md** — one-time setup, and how to send a questionnaire day to day
 - **INTEGRATION.md** — folding this into the main website later
@@ -44,6 +45,7 @@ public/                      everything the browser downloads
   assets/fonts/              self-hosted; NOT Google Fonts, which is blocked in China
   js/schema.partA.js         ← the questionnaire itself
   js/schema.partB.js         Part B, shown read-only
+  js/countries.js            countries + dialling codes, shared by two fields
   js/render.js               schema → DOM, conditionals, repeatable rows
   js/state.js                answer store + localStorage
   js/sync.js                 debounced save, offline queue, status pill
@@ -103,8 +105,15 @@ delete it; to replace one, add a new field with a new id.
 | `number` | string | typed as text on purpose, so "about 3" and "not tracked" survive; `unit` prints after the box |
 | `radio` | option value | |
 | `checkbox` | array of values | `max` caps how many; `exclusive: true` on an option makes it clear the others |
+| `select` | option value | a dropdown, for lists too long for radios; options flagged `common: true` are repeated in a group at the top |
+| `phone` | `{ country, dial, number }` | dialling code + number; the ISO code is stored too because several countries share `+1` |
 | `table` | array of row objects | `columns`, `rowLabel`, `addLabel`, `minRows` |
 | `metrics` | `{ rowId: { value, notTracked } }` | the Section F grid, each row with a "Not tracked" toggle |
+
+Countries and dialling codes are one shared list in `public/js/countries.js`,
+used by both the site-country dropdown and the phone field. Values are ISO
+alpha-2 codes, so a Chinese translation later changes every label without
+touching a single stored answer.
 
 ### Conditional questions
 

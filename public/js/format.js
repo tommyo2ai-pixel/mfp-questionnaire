@@ -19,10 +19,15 @@ export function formatValue(field, value) {
 	if (isEmpty(value)) return '';
 
 	switch (field.type) {
-		case 'radio': {
+		case 'radio':
+		case 'select': {
 			const option = (field.options || []).find((o) => o.value === value);
 			return option ? option.label : String(value);
 		}
+
+		// Stored as { country, dial, number } but read as one thing.
+		case 'phone':
+			return [value.dial, String(value.number || '').trim()].filter(Boolean).join(' ');
 
 		case 'checkbox': {
 			const chosen = [].concat(value);

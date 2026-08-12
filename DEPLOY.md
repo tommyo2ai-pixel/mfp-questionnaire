@@ -139,15 +139,19 @@ real HTTPS address you can send to a client today.
 
 In the spreadsheet: **Ming Fong ▸ Run self-test**.
 
-This creates a fake client, saves a draft, submits it, writes the files and
-sends the real emails. Check all four:
+This creates a fake client, emails the invite, saves a draft, submits it, writes
+the files and sends the real emails. Check all five:
 
-1. Two emails arrived — one notification to you, one confirmation
-2. Google Drive has **Ming Fong — Questionnaires ▸ Self-Test Company Ltd — MFP-…**
+1. **Three** emails arrived:
+   - **"Your questionnaire"** — the invite, with a green button and a code
+   - **"Questionnaire submitted"** — your notification
+   - **"Questionnaire received"** — the client's confirmation
+2. The link in the invite email opens the questionnaire. Click it.
+3. Google Drive has **Ming Fong — Questionnaires ▸ Self-Test Company Ltd — MFP-…**
    containing four files, one of them a PDF
-3. The **Submissions** and **Answers** sheets have new rows
-4. The notification email has an orange **"Internal — do not forward to the
-   client"** box
+4. The **Submissions** and **Answers** sheets have new rows
+5. The notification email has an orange **"Internal — do not forward to the
+   client"** box — and the confirmation email does **not**
 
 Then delete the Self-Test folder and its rows.
 
@@ -189,18 +193,53 @@ website's own Netlify site is not involved at any point.
 
 ---
 
+# Updating the script
+
+**Whenever `apps-script/Code.gs` changes in this project, you must paste it into
+Google again.** Pushing to GitHub updates the website; it does not touch the
+Apps Script, because that lives in your Google account and Google has no
+connection to the repository.
+
+If you skip this, the questionnaire keeps working but Google keeps behaving the
+way the old script did — which is what causes invite links pointing at the wrong
+address, and invite emails that never arrive.
+
+1. Open the **Ming Fong — Questionnaires** spreadsheet.
+2. **Extensions ▸ Apps Script**.
+3. Select everything in the editor (**Cmd-A** / **Ctrl-A**) and delete it.
+4. Open `apps-script/Code.gs` from this project, copy **all** of it, paste it in.
+5. Save.
+6. **Deploy ▸ Manage deployments ▸ ✏️ (edit) ▸ Version: New version ▸ Deploy.**
+
+Step 6 is the one people miss. Saving alone updates the editor but **not** what
+is actually running — Apps Script serves the last deployed version, so without a
+new version nothing you just pasted takes effect.
+
+You do not need to change `GAS_URL` in Netlify. Editing a deployment keeps the
+same `/exec` address.
+
+---
+
 # Sending a questionnaire
 
 1. Open the **Ming Fong — Questionnaires** spreadsheet.
 2. **Ming Fong ▸ Create invite…**
 3. Type the company name, contact name and email.
-4. Copy the link it shows you and send it by email or WeChat.
 
-The link looks like:
+The client is emailed their link and access code straight away, **and you get a
+copy of the same email**, so you can see exactly what they received and forward
+it yourself if they say it never arrived.
 
-```
-https://mfp-questionnaire.netlify.app/?c=MFP-7K4M-2QX9
-```
+A window then opens with a ready-written message containing the link and code.
+Press **Copy message** and paste it into WeChat or an email — nothing to edit.
+The link and the access code are also shown on their own at the bottom.
+
+Leave the email box blank if you would rather send it entirely yourself —
+nothing is emailed and you just get the window.
+
+If the email cannot be sent, the window says so in orange and you can still copy
+the message. The invite is created either way, so a bad address never loses the
+code.
 
 The code works from any device, so a client can start on a computer and finish
 on a phone. Their answers save as they type — they can close the page and come
@@ -212,7 +251,8 @@ The **Invites** sheet shows a **Status** and **Last activity** for each client:
 
 | Status | Meaning |
 | --- | --- |
-| `new` | Sent, not opened yet |
+| `new` | Created, but no invite email was sent — you send it yourself |
+| `sent` | Invite emailed, not opened yet |
 | `in progress` | They have started answering |
 | `submitted` | Finished — see the Submissions sheet |
 
@@ -258,6 +298,22 @@ same questions in the same order.
 Email sending is deliberately allowed to fail without failing the submission.
 A consumer Gmail account can send 100 emails a day; a Workspace account 1,500.
 Check the Apps Script tab under **Executions** for the error.
+
+**The client says the invite email never arrived — and neither did your copy.**
+Nothing was sent at all. Either the email box was left blank when the invite was
+created, or the script in Google is an old copy that cannot send invites. Redo
+**Updating the script** above, including the new-version deploy.
+
+**The client says it never arrived, but you got your copy.**
+It left successfully, so it is almost certainly in their spam folder — a first
+email from an unfamiliar sender, containing a link and a code, is exactly what
+spam filters distrust. Forward them your own copy of the invite email. Do not
+create a second invite; that issues a second code and splits their answers
+across two entries.
+
+**The invite link points at the wrong address.**
+The script in Google is an old copy. Redo **Updating the script** above, then
+check **Ming Fong ▸ Show settings** shows the address you expect.
 
 **You changed a question and want the old submissions to still make sense.**
 They do. Every submission stores the exact question text the client saw, so

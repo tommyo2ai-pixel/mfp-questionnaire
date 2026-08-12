@@ -13,6 +13,7 @@
  */
 
 import { isEmpty } from './state.js';
+import { COUNTRIES } from './countries.js';
 
 const el = (tag, attrs = {}, children = []) => {
 	const node = document.createElement(tag);
@@ -97,6 +98,10 @@ function buildControl(field, store, ctx, describedBy) {
 			return choiceControl(field, store, ctx, 'radio');
 		case 'checkbox':
 			return choiceControl(field, store, ctx, 'checkbox');
+		case 'select':
+			return selectControl(field, store, ctx, describedBy);
+		case 'phone':
+			return phoneControl(field, store, ctx, describedBy);
 		case 'table':
 			return tableControl(field, store, ctx);
 		case 'metrics':
@@ -249,6 +254,93 @@ function syncChoiceUI(field, store, list, counter) {
 				: `${chosen.size} of ${field.max} chosen`;
 		counter.classList.toggle('is-capped', chosen.size >= field.max);
 	}
+}
+
+/* ------------------------------------------------------------------ select */
+
+/*
+ * A dropdown, for lists too long to show as radio buttons. Options flagged
+ * `common` are repeated in a short group at the top: a client in Foshan should
+ * not have to scroll past Afghanistan to reach China. Both copies carry the
+ * same value, so which one they click makes no difference to what is stored.
+ */
+function selectControl(field, store, ctx, describedBy) {
+	const select = el('select', {
+		class: 'input select',
+		id: `f-${field.id}`,
+		'aria-describedby': describedBy.length ? describedBy.join(' ') : null,
+		disabled: ctx.readOnly,
+	});
+
+	select.appendChild(el('option', { value: '', text: field.placeholder || 'Select…' }));
+
+	const common = field.options.filter((o) => o.common);
+	if (common.length) {
+		select.appendChild(el('optgroup', { label: 'Most common' }, common.map((o) => el('option', { value: o.value, text: o.label }))));
+		select.appendChild(
+			el('optgroup', { label: 'All countries and regions' }, field.options.map((o) => el('option', { value: o.value, text: o.label }))),
+		);
+	} else {
+		for (const o of field.options) select.appendChild(el('option', { value: o.value, text: o.label }));
+	}
+
+	select.value = store.get(field.id) ?? '';
+	select.addEventListener('change', () => {
+		store.set(field.id, select.value);
+		applyVisibility(document, store);
+		ctx.onChange(field.id);
+	});
+	return select;
+}
+
+/* ------------------------------------------------------------------- phone */
+
+/*
+ * Dialling code + number, stored as { country, dial, number }. The country code
+ * is kept alongside the dial code because several countries share one (+1 is
+ * the US, Canada and much of the Caribbean), and without it the dropdown could
+ * not show the right entry again when the customer comes back.
+ */
+function phoneControl(field, store, ctx, describedBy) {
+	const current = store.get(field.id) || {};
+
+	const dial = el('select', {
+		class: 'input select phone-dial',
+		id: `f-${field.id}-dial`,
+		'aria-label': `${field.label} — country code`,
+		disabled: ctx.readOnly,
+	});
+	dial.appendChild(el('option', { value: '', text: 'Code' }));
+
+	// Dial code first. The box is narrow, so something has to be cut off when a
+	// country has a long name — and the code is the part that must stay legible.
+	const dialOption = (o) => el('option', { value: o.value, text: `${o.dial} — ${o.label}` });
+	const common = COUNTRIES.filter((o) => o.common);
+	dial.appendChild(el('optgroup', { label: 'Most common' }, common.map(dialOption)));
+	dial.appendChild(el('optgroup', { label: 'All countries and regions' }, COUNTRIES.map(dialOption)));
+	dial.value = current.country || '';
+
+	const number = el('input', {
+		class: 'input phone-number',
+		id: `f-${field.id}`,
+		type: 'tel',
+		inputmode: 'tel',
+		autocomplete: 'tel-national',
+		'aria-describedby': describedBy.length ? describedBy.join(' ') : null,
+		disabled: ctx.readOnly,
+	});
+	number.value = current.number ?? '';
+
+	const write = () => {
+		const chosen = COUNTRIES.find((c) => c.value === dial.value);
+		store.set(field.id, { country: dial.value, dial: chosen ? chosen.dial : '', number: number.value });
+		ctx.onChange(field.id);
+	};
+
+	dial.addEventListener('change', write);
+	number.addEventListener('input', write);
+
+	return el('div', { class: 'phone-row' }, [dial, number]);
 }
 
 /* --------------------------------------------------------------- table (C1) */

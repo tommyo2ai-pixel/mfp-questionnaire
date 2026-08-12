@@ -411,6 +411,61 @@ function siteUrl() {
 	return value.replace(/\/+$/, '');
 }
 
+/*
+ * The invite. This is the only email the client gets before they start, so it
+ * has to do three jobs at once: say who it is from, say what it costs them in
+ * time, and give them a way in that survives being forwarded to a colleague.
+ * Hence both a link and the bare code — the link is one tap on a phone, and the
+ * code still works if the link is mangled by a mail client or WeChat.
+ */
+function sendInviteEmail(code, company, contact, email) {
+	var link = siteUrl() + '/?c=' + encodeURIComponent(code);
+
+	var body = [
+		'<div style="font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#0f172a;max-width:620px;line-height:1.6">',
+		'<p>Dear ' + escapeHtml(contact || 'Sir or Madam') + ',</p>',
+		'<p>Thank you for your interest in the Flexographic Printing Standardization Program. ',
+		'Before we prepare a proposal for <strong>' + escapeHtml(company) + '</strong>, we ask a short set of questions ',
+		'so that the proposal is scoped against your actual operation rather than a generic assumption.</p>',
+
+		'<p style="margin:24px 0"><a href="' + link + '" ',
+		'style="display:inline-block;background:#047857;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold">',
+		'Open the questionnaire</a></p>',
+
+		'<p>If the button does not work, go to <a href="' + siteUrl() + '">' + escapeHtml(siteUrl()) + '</a> ',
+		'and enter this access code:</p>',
+		'<p style="font-size:20px;font-weight:bold;letter-spacing:1px;margin:8px 0 20px">' + escapeHtml(code) + '</p>',
+
+		'<p>A few things worth knowing before you start:</p>',
+		'<ul style="padding-left:20px">',
+		'<li>It takes about 25 minutes.</li>',
+		'<li><strong>Your answers save as you type.</strong> You can close the page and come back later with the same link or code — on a computer or a phone.</li>',
+		'<li>Please answer only what you know. Blank or approximate answers are genuinely useful; gaps in available information tell us something too. Please do not spend time researching answers you do not have to hand.</li>',
+		'<li>Nothing is submitted until you choose to submit it.</li>',
+		'</ul>',
+
+		'<p>All information is treated as confidential and used only for proposal preparation. ',
+		'If you would prefer the questions as a document instead, just reply to this email.</p>',
+
+		'<p>Kind regards,<br>Tommy Chan<br>Ming Fong Paper Limited, Hong Kong<br>',
+		'<a href="mailto:' + notifyAddress() + '">' + notifyAddress() + '</a></p>',
+		'</div>',
+	];
+
+	MailApp.sendEmail({
+		to: email,
+		// Tommy gets the same email, so he has a record of exactly what was sent
+		// and can forward it himself if the client says it never arrived. Bcc
+		// rather than Cc: the client has no reason to see an internal address on
+		// their copy, and replyTo already points back here.
+		bcc: notifyAddress(),
+		subject: 'Your questionnaire — Ming Fong Paper Limited',
+		htmlBody: body.join(''),
+		name: 'Ming Fong Paper Limited',
+		replyTo: notifyAddress(),
+	});
+}
+
 function sendNotification(summary, signals, flat, code, folder, pdf, submittedAt) {
 	var answered = flat.filter(function (item) {
 		return item.answer;
@@ -588,7 +643,16 @@ function setupSheet() {
 	}
 	rootFolder();
 
-	showSettings();
+	// Running this from the Apps Script editor's own Run button — rather than
+	// from the spreadsheet's Ming Fong menu — has no UI to pop a dialog into.
+	// Everything above this line still completed, so that must not read as a
+	// failure: fall back to the execution log, which is visible either way.
+	try {
+		showSettings();
+	} catch (error) {
+		Logger.log(settingsText());
+		Logger.log('Setup finished. The line above has your GAS_SECRET — copy it into Netlify. ' + '(Shown here because this was run from the editor, not from the spreadsheet’s Ming Fong menu; that menu can also show it with Show settings.)');
+	}
 }
 
 function ensureSheet(spreadsheet, name, headers) {
@@ -599,24 +663,28 @@ function ensureSheet(spreadsheet, name, headers) {
 	return sheet;
 }
 
-function showSettings() {
+function settingsText() {
 	var properties = PropertiesService.getScriptProperties();
-	SpreadsheetApp.getUi().alert(
-		'Questionnaire settings',
+	return (
 		'Copy these into Netlify (Site configuration ▸ Environment variables):\n\n' +
-			'GAS_SECRET\n' +
-			properties.getProperty(PROP_SECRET) +
-			'\n\n' +
-			'GAS_URL\n' +
-			'The /exec URL from Deploy ▸ Manage deployments.\n\n' +
-			'Invite links point at: ' +
-			siteUrl() +
-			'\nNotifications go to: ' +
-			notifyAddress() +
-			'\nDrive folder: ' +
-			ROOT_FOLDER_NAME,
-		SpreadsheetApp.getUi().ButtonSet.OK,
+		'GAS_SECRET\n' +
+		properties.getProperty(PROP_SECRET) +
+		'\n\n' +
+		'GAS_URL\n' +
+		'The /exec URL from Deploy ▸ Manage deployments.\n\n' +
+		'Invite links point at: ' +
+		siteUrl() +
+		'\nNotifications go to: ' +
+		notifyAddress() +
+		'\nDrive folder: ' +
+		ROOT_FOLDER_NAME
 	);
+}
+
+/* Sheet menu ▸ Show settings. Only callable from the spreadsheet's own menu —
+   see setupSheet() for the editor-run fallback that logs this instead. */
+function showSettings() {
+	SpreadsheetApp.getUi().alert('Questionnaire settings', settingsText(), SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 /*
@@ -652,22 +720,131 @@ function createInvitePrompt() {
 	var contact = ui.prompt('Create invite', 'Contact name (optional):', ui.ButtonSet.OK_CANCEL);
 	if (contact.getSelectedButton() !== ui.Button.OK) return;
 
-	var email = ui.prompt('Create invite', 'Contact email (optional):', ui.ButtonSet.OK_CANCEL);
+	var email = ui.prompt('Create invite', 'Contact email — leave blank to send it yourself:', ui.ButtonSet.OK_CANCEL);
 	if (email.getSelectedButton() !== ui.Button.OK) return;
 
-	var invite = createInvite(company.getResponseText().trim(), contact.getResponseText().trim(), email.getResponseText().trim());
+	var companyName = company.getResponseText().trim();
+	var contactName = contact.getResponseText().trim();
+	var address = email.getResponseText().trim();
 
-	ui.alert(
-		'Invite created',
-		'Send this to the client:\n\n' +
-			siteUrl() +
-			'/?c=' +
-			invite.code +
-			'\n\nOr have them enter the code manually:\n\n' +
-			invite.code +
-			'\n\nThe link opens the questionnaire directly. The code works from any device, so they can start on a computer and finish on a phone.',
-		ui.ButtonSet.OK,
-	);
+	var invite = createInvite(companyName, contactName, address);
+
+	// The email is the point of the whole exercise, but a send failure — quota,
+	// a typo in the address — must not lose the code that was just created. So
+	// the invite is written first, and the dialog always shows the link.
+	var status = { ok: false, message: '' };
+	if (address) {
+		try {
+			sendInviteEmail(invite.code, companyName, contactName, address);
+			markInviteSent(invite.code);
+			status = { ok: true, message: 'Emailed to ' + address + '. A copy has been sent to you.' };
+		} catch (error) {
+			status = { ok: false, message: 'Could not email ' + address + ' — ' + error.message + '. Send the message below by hand.' };
+		}
+	} else {
+		status = { ok: false, message: 'No email address given, so nothing was sent. Send the message below by hand.' };
+	}
+
+	showInviteDialog(invite.code, companyName, contactName, status);
+}
+
+/*
+ * The message Tommy pastes into WeChat or an email. Deliberately plain text
+ * with no formatting: WeChat strips anything else, and this has to survive
+ * being pasted into whatever the client happens to use.
+ */
+function inviteMessage(code, company, contact) {
+	return [
+		'Dear ' + (contact || 'Sir or Madam') + ',',
+		'',
+		'Thank you for your interest in the Flexographic Printing Standardization Program. ' +
+			'Before we prepare a proposal for ' +
+			company +
+			', please complete our short pre-proposal questionnaire:',
+		'',
+		siteUrl() + '/?c=' + code,
+		'',
+		'Access code: ' + code,
+		'',
+		'It takes about 25 minutes. Your answers save as you type, so you can close the page and ' +
+			'come back later, on a computer or a phone.',
+		'',
+		'Please answer only what you know. Blank or approximate answers are useful too — please do ' +
+			'not spend time researching anything you do not have to hand.',
+		'',
+		'Kind regards,',
+		'Tommy Chan',
+		'Ming Fong Paper Limited, Hong Kong',
+		notifyAddress(),
+	].join('\n');
+}
+
+/*
+ * Everything needed to send the invite: the message ready to copy, and the
+ * link and code in plain text as a fallback.
+ */
+function showInviteDialog(code, company, contact, status) {
+	var link = siteUrl() + '/?c=' + code;
+	var message = inviteMessage(code, company, contact);
+
+	var html = [
+		'<style>',
+		'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;',
+		'color:#0f172a;margin:0;padding:18px 20px;font-size:13px;line-height:1.5}',
+		'h2{font-size:15px;margin:0 0 2px}.sub{color:#475569;margin:0 0 14px}',
+		'.status{padding:9px 12px;border-radius:7px;margin-bottom:16px;font-size:12.5px}',
+		'.ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}',
+		'.warn{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}',
+		'label{display:block;font-weight:600;margin:0 0 5px;font-size:12px}',
+		'textarea{width:100%;box-sizing:border-box;height:210px;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;',
+		'border:1px solid #cbd5e1;border-radius:7px;padding:9px;resize:vertical;background:#f8fafc}',
+		'button{margin-top:8px;background:#047857;color:#fff;border:0;border-radius:7px;',
+		'padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer}',
+		'button:hover{background:#065f46}',
+		'.copied{color:#047857;font-weight:600;margin-left:10px;font-size:12px}',
+		'.facts{margin-top:16px;border-top:1px solid #e2e8f0;padding-top:12px;color:#475569;font-size:12px}',
+		'.facts code{background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#0f172a;font-size:12px}',
+		'</style>',
+
+		'<h2>' + escapeHtml(company) + '</h2>',
+		'<p class="sub">Invite created' + (contact ? ' for ' + escapeHtml(contact) : '') + '.</p>',
+		'<div class="status ' + (status.ok ? 'ok' : 'warn') + '">' + escapeHtml(status.message) + '</div>',
+
+		'<label for="msg">Message — copy into WeChat or email</label>',
+		'<textarea id="msg" readonly>' + escapeHtml(message) + '</textarea>',
+		'<button id="copy" type="button">Copy message</button>',
+		'<span class="copied" id="done"></span>',
+
+		'<div class="facts">',
+		'Link <code>' + escapeHtml(link) + '</code><br>',
+		'Access code <code>' + escapeHtml(code) + '</code>',
+		'</div>',
+
+		'<script>',
+		'document.getElementById("copy").addEventListener("click", function () {',
+		'  var box = document.getElementById("msg");',
+		'  box.focus(); box.select(); box.setSelectionRange(0, box.value.length);',
+		'  var done = document.getElementById("done");',
+		'  try {',
+		'    document.execCommand("copy");',
+		'    done.textContent = "Copied";',
+		'  } catch (e) {',
+		'    done.textContent = "Press Cmd-C or Ctrl-C to copy";',
+		'  }',
+		'  setTimeout(function () { done.textContent = ""; }, 4000);',
+		'});',
+		'</script>',
+	].join('');
+
+	SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(520).setHeight(430), 'Invite created');
+}
+
+/* Records that the invite email went out, so the Invites sheet distinguishes
+   "created but never sent" from "sent, not opened yet". */
+function markInviteSent(code) {
+	var invite = findInviteRow(code);
+	if (!invite) return;
+	invitesSheet().getRange(invite.rowIndex, 6).setValue('sent');
 }
 
 function createInvite(company, contact, email) {
@@ -712,16 +889,34 @@ function selfTest() {
 	var ui = SpreadsheetApp.getUi();
 	var invite = createInvite('Self-Test Company Ltd', 'Test Contact', notifyAddress());
 
+	// Sent first, and allowed to fail loudly, because this is now the email the
+	// client actually depends on to get in at all.
+	var inviteError = '';
+	try {
+		sendInviteEmail(invite.code, 'Self-Test Company Ltd', 'Test Contact', notifyAddress());
+	} catch (error) {
+		inviteError = 'Invite email FAILED: ' + error.message + '\n\n';
+	}
+
 	var answers = {
 		a_company_name: 'Self-Test Company Ltd',
 		a_contact_email: notifyAddress(),
-		a_site_address: 'Yangzhou, Jiangsu',
+		a_site_country: 'CN',
+		a_site_address: '88 Example Road, Hanjiang District, Yangzhou, Jiangsu',
 		h3_internal_owner: 'no',
 	};
 	var flat = [
 		{ section: 'A', sectionTitle: 'Company & Contact', id: 'a_company_name', question: 'Company name', answer: 'Self-Test Company Ltd' },
 		{ section: 'A', sectionTitle: 'Company & Contact', id: 'a_contact_email', question: 'Email', answer: notifyAddress() },
-		{ section: 'A', sectionTitle: 'Company & Contact', id: 'a_site_address', question: 'Site address', answer: 'Yangzhou, Jiangsu' },
+		{ section: 'A', sectionTitle: 'Company & Contact', id: 'a_site_country', question: 'Country / region of the site', answer: 'China (mainland)' },
+		{
+			section: 'A',
+			sectionTitle: 'Company & Contact',
+			id: 'a_site_address',
+			question: 'Site address',
+			answer: '88 Example Road, Hanjiang District, Yangzhou, Jiangsu',
+		},
+		{ section: 'A', sectionTitle: 'Company & Contact', id: 'a_contact_phone', question: 'Phone / WeChat', answer: '+86 138 0000 0000' },
 		{ section: 'B', sectionTitle: 'Products & Customers', id: 'b4_repeat_share', question: 'B4. Repeat work share', answer: '' },
 	];
 
@@ -730,17 +925,17 @@ function selfTest() {
 	var result = submit({
 		code: invite.code,
 		submittedAt: new Date().toISOString(),
-		schemaVersion: 'A-1.0 (self-test)',
+		schemaVersion: 'A-1.1 (self-test)',
 		answers: answers,
 		flat: flat,
 		markdown: '# Self-test\n\nThis file was produced by selfTest().\n',
 		signals: ['This is a self-test signal. If you can read it in the email, the internal notification works.'],
 		summary: {
 			company: 'Self-Test Company Ltd',
-			site: 'Yangzhou, Jiangsu',
+			site: '88 Example Road, Hanjiang District, Yangzhou, Jiangsu, China (mainland)',
 			contact: 'Test Contact',
 			email: notifyAddress(),
-			phone: '',
+			phone: '+86 138 0000 0000',
 			employees: '',
 			code: invite.code,
 		},
@@ -748,12 +943,18 @@ function selfTest() {
 
 	ui.alert(
 		'Self-test complete',
-		(result.ok ? 'Everything worked.' : 'FAILED: ' + result.error) +
+		inviteError +
+			(result.ok ? 'Everything worked.' : 'FAILED: ' + result.error) +
 			'\n\nCheck:\n' +
-			'1. Two emails have arrived at ' +
+			'1. Three emails have arrived at ' +
 			notifyAddress() +
-			'\n2. The Drive folder contains 4 files including a PDF\n' +
+			':\n' +
+			'   · "Your questionnaire" — the invite, with a working link and code\n' +
+			'   · "Questionnaire submitted" — your notification, with the orange internal box\n' +
+			'   · "Questionnaire received" — the client confirmation, with NO internal box\n' +
+			'2. The Drive folder contains 4 files including a PDF\n' +
 			'3. The Submissions and Answers sheets have new rows\n\n' +
+			'Open the link in the invite email to confirm it reaches the questionnaire.\n' +
 			'Then delete the "Self-Test Company Ltd" folder and its rows.\n\n' +
 			(result.folderUrl || ''),
 		ui.ButtonSet.OK,

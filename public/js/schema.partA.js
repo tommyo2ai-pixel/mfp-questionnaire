@@ -16,6 +16,8 @@
  *   number    numeric, optional `unit` shown after the box
  *   radio     pick one from `options`
  *   checkbox  pick any from `options`; `max` caps how many
+ *   select    pick one from a long `options` list, as a dropdown
+ *   phone     country dialling code + number, stored as { dial, number }
  *   table     repeatable rows defined by `columns`
  *   metrics   the Section F performance grid — each row has a value, a unit
  *             and a "Not tracked" toggle
@@ -33,7 +35,9 @@
  * -------------------------------------------------------------------------
  */
 
-export const SCHEMA_VERSION = 'A-1.0';
+import { COUNTRIES } from './countries.js';
+
+export const SCHEMA_VERSION = 'A-1.1';
 
 export const partA = {
 	id: 'partA',
@@ -63,10 +67,18 @@ export const partA = {
 					required: true,
 				},
 				{
+					id: 'a_site_country',
+					type: 'select',
+					label: 'Country / region of the site',
+					options: COUNTRIES,
+					placeholder: 'Select a country or region',
+				},
+				{
 					id: 'a_site_address',
-					type: 'text',
-					label: 'Site address — city and province',
-					hint: 'Affects travel arrangements, so city and province are enough.',
+					type: 'textarea',
+					rows: 3,
+					label: 'Site address',
+					hint: 'Street, district, city and province. This affects travel arrangements for the visit, so the more complete the better.',
 				},
 				{
 					id: 'a_contact_name',
@@ -82,8 +94,9 @@ export const partA = {
 				},
 				{
 					id: 'a_contact_phone',
-					type: 'text',
+					type: 'phone',
 					label: 'Phone / WeChat',
+					hint: 'Pick the country code, then type the number.',
 				},
 				{
 					id: 'a_employees',
@@ -256,9 +269,9 @@ export const partA = {
 					columns: [
 						{ id: 'make_model', label: 'Make / model' },
 						{ id: 'year', label: 'Year' },
-						{ id: 'web_width', label: 'Web width' },
+						{ id: 'web_width', label: 'Web width (m)' },
 						{ id: 'colours', label: 'Colours' },
-						{ id: 'max_speed', label: 'Max speed' },
+						{ id: 'max_speed', label: 'Max speed (m/min)' },
 						{ id: 'substrates', label: 'Substrates run' },
 					],
 				},
