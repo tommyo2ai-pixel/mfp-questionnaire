@@ -43,8 +43,10 @@ public/                      everything the browser downloads
   index.html                 the shell — login, questionnaire, receipt
   assets/app.css             design tokens copied from the marketing site
   assets/fonts/              self-hosted; NOT Google Fonts, which is blocked in China
-  js/schema.partA.js         ← the questionnaire itself
+  js/schema.partA.js         ← the questionnaire itself, in English
   js/schema.partB.js         Part B, shown read-only
+  js/i18n.zh-Hant.js         ← the Traditional Chinese of all of the above
+  js/i18n.js                 language choice + English-fallback lookup
   js/countries.js            countries + dialling codes, shared by two fields
   js/render.js               schema → DOM, conditionals, repeatable rows
   js/state.js                answer store + localStorage
@@ -63,6 +65,7 @@ netlify/functions/           the server
 
 apps-script/Code.gs          the Google backend: sheets, Drive, PDF, email
 scripts/dev.mjs              local server; runs the real functions
+scripts/check-i18n.mjs       reports anything the Chinese does not cover yet
 ```
 
 No dependencies, no build step, nothing to `npm install`. Native ES modules,
@@ -91,10 +94,15 @@ it must never include the signals block.
 Everything is in `public/js/schema.partA.js`. Commit and push; Netlify redeploys
 in about a minute.
 
-**Never change an `id`.** Ids become JSON keys in Drive and rows in the Answers
-sheet. Reword labels freely — every submission stores the question text the
-client actually saw, so old submissions stay accurate. To retire a question,
-delete it; to replace one, add a new field with a new id.
+**Never change an `id`.** Ids become JSON keys in Drive, rows in the Answers
+sheet, and the keys the Chinese dictionary is looked up by. Reword labels
+freely — every submission stores the question text the client actually saw, so
+old submissions stay accurate. To retire a question, delete it; to replace one,
+add a new field with a new id.
+
+After any edit here, add the Chinese in `public/js/i18n.zh-Hant.js` and run
+`node scripts/check-i18n.mjs`. An untranslated question shows in English rather
+than breaking, so this is the only thing that will tell you.
 
 ### Field types
 
@@ -156,20 +164,47 @@ source document intends. To make it fillable:
 Two questions in Part B have long lead times and should stay prominent wherever
 they end up: photography permission (K4) and the fingerprint test plate (P4).
 
-## Adding Chinese
+## Languages
 
-The data model is already language-neutral. The source document contains a full,
-good Chinese translation.
+English and Traditional Chinese (繁體中文), switched by two buttons in the
+header. The choice is remembered in `localStorage`; a first-time visitor whose
+browser asks for any `zh-*` locale gets Chinese.
 
-1. Add `label_zh` and `hint_zh` next to each `label` and `hint`, and `label_zh`
-   on each option.
-2. In `render.js`, read `field[\`label_${lang}\`] || field.label`.
-3. Add a toggle in the header that sets `lang` and re-renders. Store the choice
-   in `localStorage`.
+The schema stays English and remains the source of truth.
+`public/js/i18n.zh-Hant.js` is a side-car dictionary keyed by field id, and
+`public/js/i18n.js` resolves text through it with an English fallback — a key
+missing from the dictionary shows English rather than a blank.
 
-Answers do not change shape, so a questionnaire started in English can be
-finished in Chinese. The export keeps using English labels unless you also
-switch `flatten()` — keep it in English so submissions stay comparable.
+**Nothing about a language change touches the data.** Answers are stored as
+field ids and option codes, which are language-neutral, so a client can start
+in English and finish in Chinese and lose nothing. And what lands in Drive is
+**always English**: `flatten()` takes a `lang` and the submission calls it
+without one, so two clients reading the form in different languages still
+produce comparable files. The submission does record which language was used —
+it appears in the Markdown as **Completed in**, so you know which language to
+reply in.
+
+Chinese renders in the device's own font (PingFang, Microsoft JhengHei, Noto).
+A CJK webfont would be several megabytes, which is exactly what a factory
+connection cannot spare.
+
+### Editing the Chinese
+
+Everything is in `i18n.zh-Hant.js`, in three blocks: `ZH_UI` (the interface),
+`ZH_PART_A` (the questions) and `ZH_PART_B` (the preview). Field ids and option
+values must match `schema.partA.js`; the label text next to them is yours to
+change freely.
+
+After adding or renaming a question in the schema, check nothing was missed:
+
+```bash
+node scripts/check-i18n.mjs
+```
+
+### Adding a third language
+
+Copy `i18n.zh-Hant.js`, translate it, and add the file to the `UI`, `PART_A`
+and `PART_B` tables plus the `LANGS` list in `i18n.js`. No other file changes.
 
 ---
 

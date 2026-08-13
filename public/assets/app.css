@@ -60,8 +60,14 @@
 	--danger-text: #b91c1c;
 	--danger-soft: #fef2f2;
 
-	--font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
-	--font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+	/* The self-hosted files are Latin only. Chinese falls through to the fonts
+	   already on the device — PingFang on Apple, Microsoft JhengHei on Windows,
+	   Noto on Android. That is the point: a CJK webfont is several megabytes,
+	   which is exactly what a factory connection in Guangdong cannot spare, and
+	   these system faces are what every other app on that phone already uses. */
+	--font-cjk: 'PingFang TC', 'PingFang HK', 'Hiragino Sans CNS', 'Microsoft JhengHei', 'Noto Sans CJK TC', 'Noto Sans TC', sans-serif;
+	--font-display: 'Space Grotesk', ui-sans-serif, system-ui, var(--font-cjk);
+	--font-sans: 'Inter', ui-sans-serif, system-ui, var(--font-cjk);
 
 	--radius: 10px;
 	--shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px rgb(15 23 42 / 0.05);
@@ -207,6 +213,49 @@ a {
 	align-items: center;
 	gap: 0.75rem;
 	flex: 0 0 auto;
+}
+
+/* Language switch. Two buttons, each labelled in its own language, so a client
+   who cannot read the current one can still find the other. aria-pressed is the
+   state; the styling only follows it. */
+.lang-toggle {
+	display: inline-flex;
+	flex: 0 0 auto;
+	border: 1px solid rgb(241 245 249 / 0.25);
+	border-radius: 999px;
+	overflow: hidden;
+}
+
+.lang-button {
+	appearance: none;
+	border: 0;
+	background: transparent;
+	color: var(--on-navy-muted);
+	font: inherit;
+	font-size: 0.78rem;
+	line-height: 1;
+	padding: 0.45rem 0.7rem;
+	cursor: pointer;
+	white-space: nowrap;
+	transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.lang-button:hover {
+	color: var(--on-navy);
+	background: rgb(241 245 249 / 0.1);
+}
+
+.lang-button[aria-pressed='true'] {
+	background: var(--accent);
+	color: #04231a;
+	font-weight: 600;
+}
+
+@media (max-width: 560px) {
+	.lang-button {
+		font-size: 0.72rem;
+		padding: 0.4rem 0.55rem;
+	}
 }
 
 /* Save-status pill. Colour is a secondary cue only — the text always says

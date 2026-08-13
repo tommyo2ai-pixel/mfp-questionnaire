@@ -245,6 +245,21 @@ The code works from any device, so a client can start on a computer and finish
 on a phone. Their answers save as they type — they can close the page and come
 back days later.
 
+## English or Chinese
+
+The questionnaire is in **English and Traditional Chinese**, switched by two
+buttons in the top right corner. A client whose browser is set to any Chinese
+locale sees Chinese the moment the page opens, without touching anything.
+
+You do not need to do anything differently when sending it. The link is the
+same either way.
+
+**What arrives in Drive is always English**, whichever language they read. That
+is deliberate: it keeps every submission comparable, and it keeps the file you
+hand to Claude in one language. The report does note which language they used —
+`**Completed in:** Traditional Chinese` near the top — which is a useful hint
+about which language to reply in, and a second opinion on their answer to H6.
+
 ## Watching progress
 
 The **Invites** sheet shows a **Status** and **Last activity** for each client:
@@ -323,9 +338,14 @@ rewording a question never changes what an old answer appears to say.
 
 # Changing the questionnaire
 
-The questions live in one file: `public/js/schema.partA.js`. Edit the wording,
-commit, push — Netlify redeploys in about a minute. See `README.md` for the
-field types and for how to add Part B or a Chinese translation.
+The questions live in one file: `public/js/schema.partA.js`, and their Chinese
+in `public/js/i18n.zh-Hant.js`. Edit the wording in both, commit, push —
+Netlify redeploys in about a minute. See `README.md` for the field types and
+for how to add Part B.
+
+A question you reword in English but not in Chinese still works: it simply
+shows in English to a Chinese reader. `node scripts/check-i18n.mjs` lists
+anything in that state.
 
 **Never change a field's `id`.** Reword the label as much as you like; changing
 an id orphans every answer already collected.

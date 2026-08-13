@@ -29,6 +29,8 @@ const NOT_ANSWERED = '— not answered —';
  * rewording of a question cannot retrospectively change what an old submission
  * appears to say.
  */
+const LANG_NAMES = { en: 'English', 'zh-Hant': 'Traditional Chinese (繁體中文)' };
+
 export function markdownFromFlat(flat, meta = {}) {
 	const lines = [];
 	const answers = meta.answers || {};
@@ -47,6 +49,10 @@ export function markdownFromFlat(flat, meta = {}) {
 	lines.push(`**Submitted:** ${meta.submittedAt || ''}`);
 	lines.push(`**Reference:** ${meta.code || ''}`);
 	lines.push(`**Schema version:** ${meta.schemaVersion || ''}`);
+	// Which language they read the form in. The answers below are always in
+	// English so submissions stay comparable, but this is worth knowing: it says
+	// which language to reply in, and it is a second opinion on H6.
+	if (meta.lang && meta.lang !== 'en') lines.push(`**Completed in:** ${LANG_NAMES[meta.lang] || meta.lang}`);
 	lines.push('');
 
 	const answered = flat.filter((row) => row.answer).length;

@@ -51,7 +51,15 @@ export default async (request) => {
 
 	const flat = Array.isArray(body.flat) ? body.flat : [];
 	const submittedAt = new Date().toISOString();
-	const meta = { code: session.code, company: session.company, submittedAt, schemaVersion: body.schemaVersion || null };
+	const meta = {
+		code: session.code,
+		company: session.company,
+		submittedAt,
+		schemaVersion: body.schemaVersion || null,
+		// Which language the form was read in. The answers themselves are always
+		// English — this only tells Tommy which language to reply in.
+		lang: typeof body.lang === 'string' ? body.lang.slice(0, 16) : null,
+	};
 
 	try {
 		// The report and the internal signals are built here, on the server, and

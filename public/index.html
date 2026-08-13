@@ -19,7 +19,10 @@
 		<link rel="stylesheet" href="assets/app.css" />
 	</head>
 	<body>
-		<a class="visually-hidden" href="#main">Skip to content</a>
+		<!-- Text carrying data-i18n is replaced by main.js on load and on every
+		     language change. The English in the markup is the fallback if the
+		     scripts never run. -->
+		<a class="visually-hidden" href="#main" data-i18n="skipToContent">Skip to content</a>
 
 		<header class="app-header on-navy">
 			<div class="app-header-inner">
@@ -34,6 +37,9 @@
 					<span class="save-pill" id="save-pill" data-state="saved" role="status" aria-live="polite" hidden>
 						All answers saved
 					</span>
+					<!-- Filled by main.js. Deliberately not data-i18n: each button is
+					     labelled in its own language, never in the current one. -->
+					<div class="lang-toggle" id="lang-toggle" role="group"></div>
 				</div>
 			</div>
 		</header>
@@ -41,12 +47,19 @@
 		<main class="app-main" id="main">
 			<!-- Every screen is rendered into here by main.js. -->
 			<div id="app">
+				<!-- No scripts means no translation either, so this one says both. -->
 				<noscript>
 					<div class="note note-warn note-standalone">
-						This questionnaire needs JavaScript so that your answers can be saved as you go.
-						If you cannot enable it, email
-						<a href="mailto:tommy.chan@mingfongpaper.com">tommy.chan@mingfongpaper.com</a>
-						and we will send you a document version instead.
+						<p>
+							This questionnaire needs JavaScript so that your answers can be saved as you go.
+							If you cannot enable it, email
+							<a href="mailto:tommy.chan@mingfongpaper.com">tommy.chan@mingfongpaper.com</a>
+							and we will send you a document version instead.
+						</p>
+						<p lang="zh-Hant">
+							本問卷需要 JavaScript 才能在您填寫時儲存答案。若無法啟用，請來信
+							<a href="mailto:tommy.chan@mingfongpaper.com">tommy.chan@mingfongpaper.com</a>，我們會改以文件形式寄送。
+						</p>
 					</div>
 				</noscript>
 			</div>
@@ -58,7 +71,7 @@
 				<span>
 					<a href="mailto:tommy.chan@mingfongpaper.com">tommy.chan@mingfongpaper.com</a>
 				</span>
-				<span>All information is treated as confidential and used only for proposal preparation.</span>
+				<span data-i18n="confidential">All information is treated as confidential and used only for proposal preparation.</span>
 			</div>
 		</footer>
 

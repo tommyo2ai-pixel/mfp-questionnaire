@@ -14,6 +14,7 @@
 
 import { isEmpty } from './state.js';
 import { COUNTRIES } from './countries.js';
+import { t, fieldText, optionLabel, columnLabel, rowText, sectionText, countryLabel } from './i18n.js';
 
 const el = (tag, attrs = {}, children = []) => {
 	const node = document.createElement(tag);
@@ -38,9 +39,9 @@ export function renderSection(section, store, { readOnly = false, onChange = () 
 
 	root.appendChild(
 		el('header', { class: 'section-head' }, [
-			el('p', { class: 'section-eyebrow', text: `Section ${section.id}` }),
-			el('h2', { class: 'section-title', text: section.title }),
-			section.intro ? el('p', { class: 'section-intro', text: section.intro }) : null,
+			el('p', { class: 'section-eyebrow', text: t('sectionEyebrow', section.id) }),
+			el('h2', { class: 'section-title', text: sectionText(section, 'title') }),
+			section.intro ? el('p', { class: 'section-intro', text: sectionText(section, 'intro') }) : null,
 		]),
 	);
 
@@ -72,10 +73,10 @@ function renderField(field, store, ctx) {
 	const head = grouped ? el('legend', { class: 'field-label' }) : el('label', { class: 'field-label', for: `f-${field.id}` });
 
 	if (field.number) head.appendChild(el('span', { class: 'field-number', text: field.number }));
-	head.appendChild(document.createTextNode(field.label));
-	if (field.required) head.appendChild(el('span', { class: 'field-required', text: 'required', title: 'We need this one' }));
+	head.appendChild(document.createTextNode(fieldText(field, 'label')));
+	if (field.required) head.appendChild(el('span', { class: 'field-required', text: t('required'), title: t('requiredTitle') }));
 
-	const hint = field.hint ? el('p', { class: 'field-hint', id: `hint-${field.id}`, text: field.hint }) : null;
+	const hint = field.hint ? el('p', { class: 'field-hint', id: `hint-${field.id}`, text: fieldText(field, 'hint') }) : null;
 
 	const control = buildControl(field, store, ctx, describedBy);
 
@@ -131,7 +132,7 @@ function inputControl(field, store, ctx, describedBy) {
 	});
 
 	if (!field.unit) return input;
-	return el('div', { class: 'input-with-unit' }, [input, el('span', { class: 'input-unit', text: field.unit })]);
+	return el('div', { class: 'input-with-unit' }, [input, el('span', { class: 'input-unit', text: fieldText(field, 'unit') })]);
 }
 
 // Numbers are typed as text on purpose: type="number" silently discards
@@ -177,7 +178,7 @@ function choiceControl(field, store, ctx, kind) {
 		});
 
 		const row = el('div', { class: 'choice' }, [
-			el('label', { class: 'choice-label', for: inputId }, [input, el('span', { text: option.label })]),
+			el('label', { class: 'choice-label', for: inputId }, [input, el('span', { text: optionLabel(field, option) })]),
 		]);
 
 		// Inline follow-ups ("Yes — how many: ___") live inside the option so
@@ -248,10 +249,7 @@ function syncChoiceUI(field, store, list, counter) {
 	}
 
 	if (counter) {
-		counter.textContent =
-			chosen.size >= field.max
-				? `${field.max} of ${field.max} chosen — untick one to change your answer`
-				: `${chosen.size} of ${field.max} chosen`;
+		counter.textContent = chosen.size >= field.max ? t('chosenAtCap', field.max) : t('chosenOf', chosen.size, field.max);
 		counter.classList.toggle('is-capped', chosen.size >= field.max);
 	}
 }
@@ -272,16 +270,15 @@ function selectControl(field, store, ctx, describedBy) {
 		disabled: ctx.readOnly,
 	});
 
-	select.appendChild(el('option', { value: '', text: field.placeholder || 'Select…' }));
+	select.appendChild(el('option', { value: '', text: fieldText(field, 'placeholder') || t('selectPlaceholder') }));
 
+	const option = (o) => el('option', { value: o.value, text: optionLabel(field, o) });
 	const common = field.options.filter((o) => o.common);
 	if (common.length) {
-		select.appendChild(el('optgroup', { label: 'Most common' }, common.map((o) => el('option', { value: o.value, text: o.label }))));
-		select.appendChild(
-			el('optgroup', { label: 'All countries and regions' }, field.options.map((o) => el('option', { value: o.value, text: o.label }))),
-		);
+		select.appendChild(el('optgroup', { label: t('groupCommon') }, common.map(option)));
+		select.appendChild(el('optgroup', { label: t('groupAll') }, field.options.map(option)));
 	} else {
-		for (const o of field.options) select.appendChild(el('option', { value: o.value, text: o.label }));
+		for (const o of field.options) select.appendChild(option(o));
 	}
 
 	select.value = store.get(field.id) ?? '';
@@ -307,17 +304,17 @@ function phoneControl(field, store, ctx, describedBy) {
 	const dial = el('select', {
 		class: 'input select phone-dial',
 		id: `f-${field.id}-dial`,
-		'aria-label': `${field.label} — country code`,
+		'aria-label': t('phoneCountryCode', fieldText(field, 'label')),
 		disabled: ctx.readOnly,
 	});
-	dial.appendChild(el('option', { value: '', text: 'Code' }));
+	dial.appendChild(el('option', { value: '', text: t('dialCode') }));
 
 	// Dial code first. The box is narrow, so something has to be cut off when a
 	// country has a long name — and the code is the part that must stay legible.
-	const dialOption = (o) => el('option', { value: o.value, text: `${o.dial} — ${o.label}` });
+	const dialOption = (o) => el('option', { value: o.value, text: `${o.dial} — ${countryLabel(o)}` });
 	const common = COUNTRIES.filter((o) => o.common);
-	dial.appendChild(el('optgroup', { label: 'Most common' }, common.map(dialOption)));
-	dial.appendChild(el('optgroup', { label: 'All countries and regions' }, COUNTRIES.map(dialOption)));
+	dial.appendChild(el('optgroup', { label: t('groupCommon') }, common.map(dialOption)));
+	dial.appendChild(el('optgroup', { label: t('groupAll') }, COUNTRIES.map(dialOption)));
 	dial.value = current.country || '';
 
 	const number = el('input', {
@@ -348,6 +345,7 @@ function phoneControl(field, store, ctx, describedBy) {
 function tableControl(field, store, ctx) {
 	const container = el('div', { class: 'table-rows' });
 	const blank = () => Object.fromEntries(field.columns.map((c) => [c.id, '']));
+	const rowLabel = fieldText(field, 'rowLabel') || t('addRow');
 
 	const draw = () => {
 		const rows = store.get(field.id) || [];
@@ -360,13 +358,13 @@ function tableControl(field, store, ctx) {
 			const card = el('div', { class: 'row-card' });
 			card.appendChild(
 				el('div', { class: 'row-card-head' }, [
-					el('span', { class: 'row-card-title', text: `${field.rowLabel || 'Row'} ${index + 1}` }),
+					el('span', { class: 'row-card-title', text: `${rowLabel} ${index + 1}` }),
 					rows.length > (field.minRows || 1) && !ctx.readOnly
 						? el('button', {
 								type: 'button',
 								class: 'link-button',
-								text: 'Remove',
-								'aria-label': `Remove ${field.rowLabel || 'row'} ${index + 1}`,
+								text: t('remove'),
+								'aria-label': t('removeRow', rowLabel, index + 1),
 								onclick: () => {
 									const next = (store.get(field.id) || []).slice();
 									next.splice(index, 1);
@@ -391,7 +389,9 @@ function tableControl(field, store, ctx) {
 					store.set(field.id, next);
 					ctx.onChange(field.id);
 				});
-				grid.appendChild(el('div', { class: 'row-cell' }, [el('label', { class: 'row-cell-label', for: inputId, text: col.label }), input]));
+				grid.appendChild(
+					el('div', { class: 'row-cell' }, [el('label', { class: 'row-cell-label', for: inputId, text: columnLabel(field, col) }), input]),
+				);
 			}
 			card.appendChild(grid);
 			container.appendChild(card);
@@ -406,7 +406,7 @@ function tableControl(field, store, ctx) {
 			el('button', {
 				type: 'button',
 				class: 'button button-secondary button-add',
-				text: field.addLabel || 'Add row',
+				text: fieldText(field, 'addLabel') || t('addRow'),
 				onclick: () => {
 					store.set(field.id, [...(store.get(field.id) || []), blank()]);
 					draw();
@@ -459,10 +459,10 @@ function metricsControl(field, store, ctx) {
 
 		table.appendChild(
 			el('div', { class: 'metric' }, [
-				el('label', { class: 'metric-label', for: inputId, text: row.label }),
+				el('label', { class: 'metric-label', for: inputId, text: rowText(row, 'label') }),
 				el('div', { class: 'metric-controls' }, [
-					el('div', { class: 'input-with-unit' }, [input, el('span', { class: 'input-unit', text: row.unit })]),
-					el('label', { class: 'metric-nt', for: toggleId }, [toggle, el('span', { text: 'Not tracked' })]),
+					el('div', { class: 'input-with-unit' }, [input, el('span', { class: 'input-unit', text: rowText(row, 'unit') })]),
+					el('label', { class: 'metric-nt', for: toggleId }, [toggle, el('span', { text: t('notTracked') })]),
 				]),
 			]),
 		);

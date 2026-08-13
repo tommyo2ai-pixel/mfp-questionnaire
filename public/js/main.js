@@ -13,6 +13,20 @@ import { createStore, isEmpty } from './state.js';
 import { createSync } from './sync.js';
 import { renderSection, applyVisibility, countProgress, sectionProgress } from './render.js';
 import { flatten } from './format.js';
+import {
+	LANGS,
+	getLang,
+	setLang,
+	applyDocumentLang,
+	t,
+	syncStatusText,
+	fieldText,
+	optionLabel,
+	sectionText,
+	schemaText,
+	partBText,
+	partBSection,
+} from './i18n.js';
 
 const app = document.getElementById('app');
 const savePill = document.getElementById('save-pill');
@@ -22,6 +36,14 @@ let session = null;
 let store = null;
 let sync = null;
 let step = 0; // 0..sections.length-1 are sections; sections.length is Review
+
+/*
+ * Whichever screen is currently on show, so a language change can redraw it.
+ * Every screen sets this as it renders. Re-rendering is safe at any moment:
+ * answers live in the store, never in the DOM, so nothing typed can be lost by
+ * a redraw — which is exactly why switching language mid-question is allowed.
+ */
+let lastScreen = () => {};
 
 const steps = () => [...partA.sections.map((s) => ({ kind: 'section', section: s })), { kind: 'review' }];
 
@@ -42,25 +64,21 @@ async function api(path, options = {}) {
 function showLogin({ code = '', error = '' } = {}) {
 	savePill.hidden = true;
 	app.textContent = '';
+	lastScreen = () => showLogin({ code: document.getElementById('code')?.value ?? code, error });
 
 	const box = document.createElement('div');
 	box.className = 'login';
 	box.innerHTML = `
-		<h1>Pre-Proposal Questionnaire</h1>
-		<p class="login-intro">
-			Flexographic Printing Standardization Program. Enter the access code from your
-			invitation to begin, or to continue a questionnaire you have already started.
-		</p>
+		<h1>${escapeHtml(t('loginTitle'))}</h1>
+		<p class="login-intro">${escapeHtml(t('loginIntro'))}</p>
 		<form novalidate>
-			<label class="visually-hidden" for="code">Access code</label>
+			<label class="visually-hidden" for="code">${escapeHtml(t('loginCodeLabel'))}</label>
 			<input class="input" id="code" name="code" type="text" autocomplete="one-time-code"
 				spellcheck="false" placeholder="MFP-XXXX-XXXX" required />
-			<button class="button button-primary" type="submit">Continue</button>
+			<button class="button button-primary" type="submit">${escapeHtml(t('loginSubmit'))}</button>
 		</form>
 		<p class="login-help">
-			No code, or it is not working? Email
-			<a href="mailto:tommy.chan@mingfongpaper.com">tommy.chan@mingfongpaper.com</a>
-			and we will send you a new one.
+			${escapeHtml(t('loginHelpBefore'))}<a href="mailto:tommy.chan@mingfongpaper.com">tommy.chan@mingfongpaper.com</a>${escapeHtml(t('loginHelpAfter'))}
 		</p>
 	`;
 
@@ -83,12 +101,12 @@ function showLogin({ code = '', error = '' } = {}) {
 		if (!value) return input.focus();
 
 		button.disabled = true;
-		button.textContent = 'Checking…';
+		button.textContent = t('loginChecking');
 		try {
 			const result = await api('/api/session', { method: 'POST', body: JSON.stringify({ code: value }) });
 			await start(result);
 		} catch (err) {
-			showLogin({ code: value, error: err.message || 'That code was not recognised.' });
+			showLogin({ code: value, error: err.message || t('loginBadCode') });
 			document.getElementById('code')?.focus();
 		}
 	});
@@ -101,7 +119,7 @@ function showLogin({ code = '', error = '' } = {}) {
 
 async function start(newSession) {
 	session = newSession;
-	brandSub.textContent = session.company || 'Pre-Proposal Questionnaire';
+	brandSub.textContent = session.company || t('brandSub');
 
 	if (session.status === 'submitted') {
 		store = createStore(session.code);
@@ -128,17 +146,20 @@ async function start(newSession) {
 
 	sync = createSync({
 		store,
-		onStatus: (state, text) => {
+		// The status text is looked up here rather than taken from sync.js, so a
+		// language change re-labels the pill without the sync layer knowing that
+		// languages exist.
+		onStatus: (state) => {
 			savePill.dataset.state = state;
-			savePill.textContent = text;
+			savePill.textContent = syncStatusText(state);
 		},
 	});
 	savePill.hidden = false;
-	savePill.textContent = 'All answers saved';
+	savePill.textContent = syncStatusText('saved');
 
 	window.addEventListener('mfp:session-expired', () => {
 		sync?.stop();
-		showLogin({ code: session.code, error: 'Your session timed out. Enter your code again — nothing has been lost.' });
+		showLogin({ code: session.code, error: t('sessionExpired') });
 	});
 
 	step = 0;
@@ -148,6 +169,7 @@ async function start(newSession) {
 /* ------------------------------------------------------------------ shell */
 
 function renderApp() {
+	lastScreen = renderApp;
 	app.textContent = '';
 
 	const layout = document.createElement('div');
@@ -180,9 +202,9 @@ function buildPreamble() {
 	const box = document.createElement('div');
 	box.className = 'preamble';
 	const heading = document.createElement('h1');
-	heading.textContent = partA.title;
+	heading.textContent = schemaText(partA, 'title');
 	box.appendChild(heading);
-	for (const text of partA.preamble) {
+	for (const text of schemaText(partA, 'preamble')) {
 		const p = document.createElement('p');
 		p.textContent = text;
 		box.appendChild(p);
@@ -193,11 +215,11 @@ function buildPreamble() {
 function buildNav() {
 	const nav = document.createElement('nav');
 	nav.className = 'nav';
-	nav.setAttribute('aria-label', 'Questionnaire sections');
+	nav.setAttribute('aria-label', t('navSections'));
 
 	const title = document.createElement('p');
 	title.className = 'nav-title';
-	title.textContent = 'Sections';
+	title.textContent = t('navTitle');
 	nav.appendChild(title);
 
 	const list = document.createElement('ul');
@@ -213,11 +235,11 @@ function buildNav() {
 		button.setAttribute('aria-current', String(index === step));
 
 		if (entry.kind === 'review') {
-			button.innerHTML = `<span class="nav-key">✓</span><span>Review &amp; submit</span>`;
+			button.innerHTML = `<span class="nav-key">✓</span><span>${escapeHtml(t('navReview'))}</span>`;
 		} else {
 			const { answered, total } = sectionProgress(entry.section, store);
 			if (answered === total) item.classList.add('is-complete');
-			button.innerHTML = `<span class="nav-key">${entry.section.id}</span><span>${entry.section.title}</span><span class="nav-count">${answered}/${total}</span>`;
+			button.innerHTML = `<span class="nav-key">${entry.section.id}</span><span>${escapeHtml(sectionText(entry.section, 'title'))}</span><span class="nav-count">${answered}/${total}</span>`;
 		}
 
 		button.addEventListener('click', () => goTo(index));
@@ -237,11 +259,11 @@ function buildStepper() {
 	row.className = 'stepper-row';
 
 	const select = document.createElement('select');
-	select.setAttribute('aria-label', 'Jump to section');
+	select.setAttribute('aria-label', t('jumpToSection'));
 	steps().forEach((entry, index) => {
 		const option = document.createElement('option');
 		option.value = String(index);
-		option.textContent = entry.kind === 'review' ? 'Review & submit' : `${entry.section.id}. ${entry.section.title}`;
+		option.textContent = entry.kind === 'review' ? t('navReview') : `${entry.section.id}. ${sectionText(entry.section, 'title')}`;
 		option.selected = index === step;
 		select.appendChild(option);
 	});
@@ -272,7 +294,7 @@ function buildPager() {
 		const back = document.createElement('button');
 		back.type = 'button';
 		back.className = 'button button-secondary';
-		back.textContent = 'Back';
+		back.textContent = t('back');
 		back.addEventListener('click', () => goTo(step - 1));
 		pager.appendChild(back);
 	}
@@ -280,7 +302,7 @@ function buildPager() {
 	const next = document.createElement('button');
 	next.type = 'button';
 	next.className = 'button button-primary button-next';
-	next.textContent = step === total - 2 ? 'Review answers' : 'Next section';
+	next.textContent = step === total - 2 ? t('reviewAnswers') : t('nextSection');
 	next.addEventListener('click', () => goTo(step + 1));
 	pager.appendChild(next);
 
@@ -300,8 +322,8 @@ function refreshProgress() {
 	if (bar) bar.style.width = `${total ? (answered / total) * 100 : 0}%`;
 	if (text) {
 		const current = steps()[step];
-		const where = current.kind === 'review' ? 'Review' : `Section ${step + 1} of ${partA.sections.length}`;
-		text.textContent = `${where} · ${answered} of ${total} questions answered`;
+		const where = current.kind === 'review' ? t('progressReview') : t('progressWhere', step + 1, partA.sections.length);
+		text.textContent = t('progress', where, answered, total);
 	}
 
 	// The desktop rail carries per-section counts, so it has to follow along.
@@ -321,15 +343,17 @@ function buildReview() {
 	const section = document.createElement('section');
 	section.className = 'section';
 
-	const rows = flatten(partA, store.getAll());
+	// The review reads in whichever language the client is using; the copy sent
+	// to Drive on submit is always English. See doSubmit().
+	const rows = flatten(partA, store.getAll(), { lang: getLang() });
 	const blanks = rows.filter((r) => !r.answer).length;
 
 	const head = document.createElement('header');
 	head.className = 'section-head';
 	head.innerHTML = `
-		<p class="section-eyebrow">Final step</p>
-		<h2 class="section-title">Review &amp; submit</h2>
-		<p class="section-intro">${escapeHtml(partA.closing)}</p>
+		<p class="section-eyebrow">${escapeHtml(t('reviewEyebrow'))}</p>
+		<h2 class="section-title">${escapeHtml(t('reviewTitle'))}</h2>
+		<p class="section-intro">${escapeHtml(schemaText(partA, 'closing'))}</p>
 	`;
 	section.appendChild(head);
 
@@ -337,14 +361,17 @@ function buildReview() {
 	if (missing.length) {
 		const note = document.createElement('div');
 		note.className = 'note note-error';
-		note.innerHTML = `We need ${missing.map((f) => `<strong>${escapeHtml(f.label)}</strong>`).join(' and ')} before you can submit — that is how we reply to you. Everything else is optional.`;
+		note.innerHTML = t(
+			'reviewMissing',
+			missing.map((f) => `<strong>${escapeHtml(fieldText(f, 'label'))}</strong>`).join(t('and')),
+		);
 		section.appendChild(note);
 
 		const jump = document.createElement('button');
 		jump.type = 'button';
 		jump.className = 'button button-secondary';
 		jump.style.marginTop = '0.75rem';
-		jump.textContent = 'Go to Section A';
+		jump.textContent = t('reviewGoToA');
 		jump.addEventListener('click', () => {
 			goTo(0);
 			const target = document.getElementById(`f-${missing[0].id}`);
@@ -355,7 +382,7 @@ function buildReview() {
 	} else if (blanks > 0) {
 		const note = document.createElement('div');
 		note.className = 'note note-info';
-		note.textContent = `You have left ${blanks} question${blanks === 1 ? '' : 's'} blank. That is completely fine — blanks tell us what is not currently tracked, which is useful in itself. Submit whenever you are ready.`;
+		note.textContent = t('reviewBlanks', blanks);
 		section.appendChild(note);
 	}
 
@@ -377,7 +404,7 @@ function buildReview() {
 		q.textContent = row.question;
 		const a = document.createElement('div');
 		a.className = row.answer ? 'review-a' : 'review-a is-blank';
-		a.textContent = row.answer || 'Not answered';
+		a.textContent = row.answer || t('notAnswered');
 		item.append(q, a);
 		list.appendChild(item);
 	}
@@ -391,14 +418,14 @@ function buildReview() {
 	const back = document.createElement('button');
 	back.type = 'button';
 	back.className = 'button button-secondary';
-	back.textContent = 'Back';
+	back.textContent = t('back');
 	back.addEventListener('click', () => goTo(step - 1));
 	actions.appendChild(back);
 
 	const submit = document.createElement('button');
 	submit.type = 'button';
 	submit.className = 'button button-primary button-next';
-	submit.textContent = 'Submit questionnaire';
+	submit.textContent = t('submit');
 	submit.disabled = missing.length > 0;
 	submit.addEventListener('click', () => doSubmit(submit, blanks));
 	actions.appendChild(submit);
@@ -431,16 +458,12 @@ async function doSubmit(button, blanks) {
 	status.textContent = '';
 
 	if (blanks > 0) {
-		const ok = window.confirm(
-			`You have left ${blanks} question${blanks === 1 ? '' : 's'} blank.\n\n` +
-				'That is fine — blank answers are useful and tell us what is not currently tracked. ' +
-				'You will not be able to edit the questionnaire after submitting.\n\nSubmit now?',
-		);
+		const ok = window.confirm(t('submitConfirm', blanks));
 		if (!ok) return;
 	}
 
 	button.disabled = true;
-	button.textContent = 'Submitting…';
+	button.textContent = t('submitting');
 
 	try {
 		// Get the latest draft to the server first, so a failure here still
@@ -451,8 +474,12 @@ async function doSubmit(button, blanks) {
 			method: 'POST',
 			body: JSON.stringify({
 				answers: store.getAll(),
+				// Deliberately English, whatever the client was reading. The files in
+				// Drive are read by the consultant and compared across clients, so
+				// they must not vary by the language the form happened to be in.
 				flat: flatten(partA, store.getAll()),
 				schemaVersion: SCHEMA_VERSION,
+				lang: getLang(),
 			}),
 		});
 
@@ -460,13 +487,10 @@ async function doSubmit(button, blanks) {
 		showReceipt({ submittedAt: result.submittedAt });
 	} catch (err) {
 		button.disabled = false;
-		button.textContent = 'Submit questionnaire';
+		button.textContent = t('submit');
 		const note = document.createElement('div');
 		note.className = 'note note-error';
-		note.textContent =
-			err.status === 409
-				? 'This questionnaire has already been submitted. Please contact us if you need to change an answer.'
-				: `We could not submit just now: ${err.message}. Your answers are saved — please try again in a moment.`;
+		note.textContent = err.status === 409 ? t('submitAlready') : t('submitFailed', err.message);
 		status.appendChild(note);
 	}
 }
@@ -474,6 +498,7 @@ async function doSubmit(button, blanks) {
 /* ---------------------------------------------------------------- receipt */
 
 function showReceipt({ submittedAt }) {
+	lastScreen = () => showReceipt({ submittedAt });
 	savePill.hidden = true;
 	app.textContent = '';
 
@@ -482,17 +507,16 @@ function showReceipt({ submittedAt }) {
 	section.style.maxWidth = '48rem';
 	section.style.margin = '2rem auto';
 
-	const when = submittedAt ? new Date(submittedAt).toLocaleString() : '';
+	const when = submittedAt ? new Date(submittedAt).toLocaleString(getLang()) : '';
 	section.innerHTML = `
 		<div class="receipt-mark" aria-hidden="true">✓</div>
-		<h2 class="section-title">Thank you — your questionnaire has been received</h2>
+		<h2 class="section-title">${escapeHtml(t('receiptTitle'))}</h2>
 		<p class="section-intro">
-			${escapeHtml(partA.closing)}
+			${escapeHtml(schemaText(partA, 'closing'))}
 		</p>
 		<div class="note note-info note-spaced">
-			We will review your answers and be in touch at
-			<strong>${escapeHtml(store?.get('a_contact_email') || 'the address you provided')}</strong>.
-			${when ? `Submitted ${escapeHtml(when)}.` : ''}
+			${escapeHtml(t('receiptContactBefore'))}<strong>${escapeHtml(store?.get('a_contact_email') || t('receiptFallbackEmail'))}</strong>${escapeHtml(t('receiptContactAfter'))}
+			${when ? escapeHtml(t('receiptSubmittedAt', when)) : ''}
 		</div>
 	`;
 
@@ -501,17 +525,14 @@ function showReceipt({ submittedAt }) {
 		const note = document.createElement('div');
 		note.className = 'note note-info';
 		note.style.marginTop = '1rem';
-		const labels = partA.sections
-			.flatMap((s) => s.fields)
-			.find((f) => f.id === 'opt_documents')
-			.options.filter((o) => optional.includes(o.value))
-			.map((o) => o.label);
-		note.innerHTML = `You indicated these documents already exist: <strong>${labels.map(escapeHtml).join(', ')}</strong>. Please email them to <a href="mailto:tommy.chan@mingfongpaper.com">tommy.chan@mingfongpaper.com</a> when convenient — there is no need to create anything new.`;
+		const documents = partA.sections.flatMap((s) => s.fields).find((f) => f.id === 'opt_documents');
+		const labels = documents.options.filter((o) => optional.includes(o.value)).map((o) => optionLabel(documents, o));
+		note.innerHTML = t('receiptOptional', labels.map(escapeHtml).join(t('listSeparator')));
 		section.appendChild(note);
 	}
 
 	const answers = store?.getAll() || {};
-	const rows = flatten(partA, answers);
+	const rows = flatten(partA, answers, { lang: getLang() });
 	const list = document.createElement('ul');
 	list.className = 'review-list';
 	let currentSection = null;
@@ -539,14 +560,14 @@ function showReceipt({ submittedAt }) {
 	const heading = document.createElement('h3');
 	heading.style.marginTop = '2rem';
 	heading.style.fontFamily = 'var(--font-display)';
-	heading.textContent = 'Your answers';
+	heading.textContent = t('yourAnswers');
 	section.append(heading, list);
 
 	const print = document.createElement('button');
 	print.type = 'button';
 	print.className = 'button button-secondary';
 	print.style.marginTop = '1.5rem';
-	print.textContent = 'Print or save a copy';
+	print.textContent = t('printCopy');
 	print.addEventListener('click', () => window.print());
 	section.appendChild(print);
 
@@ -560,7 +581,7 @@ function buildPartBPreview() {
 	details.className = 'partb';
 
 	const summary = document.createElement('summary');
-	summary.textContent = `${partBPreview.title} — nothing to do now`;
+	summary.textContent = t('partBSummary', partBText(partBPreview, 'title'));
 	details.appendChild(summary);
 
 	const body = document.createElement('div');
@@ -569,24 +590,24 @@ function buildPartBPreview() {
 	const intro = document.createElement('p');
 	intro.className = 'section-intro';
 	intro.style.marginBottom = '1.5rem';
-	intro.textContent = partBPreview.intro;
+	intro.textContent = partBText(partBPreview, 'intro');
 	body.appendChild(intro);
 
 	for (const group of partBPreview.sections) {
 		const block = document.createElement('div');
 		block.className = 'partb-section';
 		const heading = document.createElement('h3');
-		heading.textContent = `${group.id}. ${group.title}`;
+		heading.textContent = `${group.id}. ${partBSection(group, 'title')}`;
 		block.appendChild(heading);
 		if (group.note) {
 			const note = document.createElement('div');
 			note.className = 'note note-warn';
 			note.style.margin = '0.5rem 0 0.75rem';
-			note.textContent = group.note;
+			note.textContent = partBSection(group, 'note');
 			block.appendChild(note);
 		}
 		const list = document.createElement('ul');
-		for (const point of group.items) {
+		for (const point of partBSection(group, 'items')) {
 			const li = document.createElement('li');
 			li.textContent = point;
 			list.appendChild(li);
@@ -599,6 +620,51 @@ function buildPartBPreview() {
 	return details;
 }
 
+/* --------------------------------------------------------- language switch */
+
+/*
+ * Two buttons in the header rather than a dropdown: with only two languages a
+ * dropdown hides the fact that the other one exists, and a client who cannot
+ * read the English header would have to open it to find out. Each button is
+ * labelled in its own language, so neither depends on the other being readable.
+ */
+function mountLangToggle() {
+	const host = document.getElementById('lang-toggle');
+	if (!host) return;
+	host.textContent = '';
+	host.setAttribute('aria-label', t('langLabel'));
+
+	for (const lang of LANGS) {
+		const button = document.createElement('button');
+		button.type = 'button';
+		button.className = 'lang-button';
+		button.lang = lang.htmlLang;
+		button.textContent = lang.label;
+		button.setAttribute('aria-pressed', String(lang.code === getLang()));
+		button.addEventListener('click', () => setLang(lang.code));
+		host.appendChild(button);
+	}
+}
+
+/*
+ * Redraw everything after a language change. The store is untouched — answers
+ * are ids and codes, not text — so this is a repaint, not a data migration.
+ */
+window.addEventListener('mfp:lang', () => {
+	mountLangToggle();
+	applyStaticText();
+	if (!savePill.hidden && sync) savePill.textContent = syncStatusText(sync.status());
+	lastScreen();
+});
+
+/** The strings that live in index.html rather than in a screen. */
+function applyStaticText() {
+	applyDocumentLang();
+	for (const node of document.querySelectorAll('[data-i18n]')) node.textContent = t(node.dataset.i18n);
+	// Not data-i18n, because after login this carries the company name instead.
+	if (brandSub && !session?.company) brandSub.textContent = t('brandSub');
+}
+
 /* ------------------------------------------------------------------ utils */
 
 function escapeHtml(value) {
@@ -608,6 +674,9 @@ function escapeHtml(value) {
 /* ------------------------------------------------------------------- init */
 
 (async function init() {
+	applyStaticText();
+	mountLangToggle();
+
 	const params = new URLSearchParams(location.search);
 	const codeFromLink = (params.get('c') || '').trim().toUpperCase();
 
